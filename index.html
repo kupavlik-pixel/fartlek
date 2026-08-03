@@ -227,6 +227,13 @@
         function handlePauseResume() { if (!isRunning) return; if (isPaused) { isPaused = false; btnPauseResume.textContent = "ПАУЗА"; btnPauseResume.classList.remove('resume-mode'); } else { isPaused = true; btnPauseResume.textContent = "ПРОДОЛЖИТЬ"; btnPauseResume.classList.add('resume-mode'); } }
         function confirmStop(confirmed) { confirmModal.classList.remove('active'); if (confirmed) { clearInterval(timerInterval); finishWorkout(); totalElapsedSeconds = 0; currentRowIndex = -1; updateDisplay(); intervalNameDisplay.textContent = ""; totalTimeDisplay.textContent = "Общее время тренировки: 00:00"; } else { isPaused = false; btnPauseResume.textContent = "ПАУЗА"; btnPauseResume.classList.remove('resume-mode'); } }
         renderHome();
+    </script>   
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('sw.js');
+        });
+      }
     </script>
 </body>
 </html>
