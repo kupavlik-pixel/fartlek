@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <!-- Специальные теги для iPhone, чтобы открыть на весь экран без браузера -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Фартлек">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    
+    <!-- Иконка приложения (встроена прямо в код) -->
+    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%232ecc71'/><text y='72' x='50' font-size='60' text-anchor='middle' fill='white'>⏱</text></svg>">
+    
+    <title>Таймер Фартлек</title>
+    <style>
+        :root {
+            --bg-color: #f5f5f5;
+            --text-color: #333;
+            --active-bg: #2ecc71;
+            --active-text: white;
+            --primary-color: #3498db;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            /* Отступы для экранов с челкой (iPhone X и выше) */
+            padding-top: max(20px, env(safe-area-inset-top));
+            padding-bottom: max(20px, env(safe-area-inset-bottom));
+            max-width: 600px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            box-sizing: border-box;
+        }
+
+        .screen { display: none; flex-direction: column; flex: 1; }
+        .screen.active { display: flex; }
+
+        #home-view h2 { text-align: center; margin-top: 30px; }
+        .timer-list { display: flex; flex-direction: column; gap: 10px; margin-top: 20px; }
+        .timer-card {
+            background: white; padding: 15px; border-radius: 12px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            display: flex; justify-content: space-between; align-items: center; cursor: pointer;
+        }
+        .timer-card-name { font-weight: bold; font-size: 18px; }
+        .timer-card-info { font-size: 12px; color: #666; }
+        .delete-card {
+            background: #e74c3c; color: white; border: none; border-radius: 50%;
+            width: 30px; height: 30px; font-size: 16px; cursor: pointer; flex-shrink: 0;
+        }
+        .big-add-btn {
+            background: var(--primary-color); color: white; border: none;
+            width: 70px; height: 70px; border-radius: 50%; font-size: 40px;
+            line-height: 65px; text-align: center; align-self: center; margin-top: 40px;
+            cursor: pointer; box-shadow: 0 4px 10px rgba(52, 152, 219, 0.4);
+        }
+
+        .top-nav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .nav-btn { background: none; border: none; color: var(--primary-color); font-size: 18px; cursor: pointer; padding: 5px; }
+        .nav-btn:disabled { color: #ccc; }
+
+        #timer-display { font-size: 70px; font-weight: bold; text-align: center; margin: 10px 0; }
+        #current-interval-name { font-size: 22px; text-align: center; margin-bottom: 20px; height: 30px; font-weight: bold; color: #666; }
+        #total-time-display { font-size: 16px; color: #333; margin-top: 15px; font-weight: bold; background: #e0e0e0; padding: 10px 20px; border-radius: 8px; text-align: center; }
+
+        table { width: 100%; border-collapse: collapse; margin-bottom: 15px; }
+        th { text-align: left; padding: 10px; border-bottom: 2px solid #ddd; color: #666; font-size: 14px; }
+        td { padding: 5px; border-bottom: 1px solid #eee; position: relative; }
+        .input-wrapper { position: relative; width: 90%; }
+        input { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 8px; font-size: 16px; box-sizing: border-box; color: #999; font-weight: normal; background-color: white; }
+        input.filled { color: #333; font-weight: bold; border-color: #999; }
+        input:focus { outline: none; border-color: var(--primary-color); box-shadow: 0 0 5px rgba(52, 152, 219, 0.3); }
+        input:disabled { background-color: #f9f9f9; cursor: not-allowed; }
+
+        .clear-btn { display: none; position: absolute; right: 5px; top: 50%; transform: translateY(-50%); background: rgba(0,0,0,0.5); color: white; border: none; border-radius: 4px; padding: 4px 8px; font-size: 11px; cursor: pointer; z-index: 10; }
+        .input-wrapper:hover .clear-btn { display: block; }
+        tr.active-row input { background-color: var(--active-bg); color: var(--active-text) !important; font-weight: bold; border-color: var(--active-bg); }
+        tr.active-row .clear-btn { display: none !important; }
+
+        .controls-container { display: flex; gap: 10px; width: 100%; }
+        .btn-control { flex: 1; padding: 15px; font-size: 18px; font-weight: bold; border: none; border-radius: 12px; cursor: pointer; color: white; }
+        #btn-start { background-color: #2ecc71; }
+        #btn-start.stop-mode { background-color: #e74c3c; }
+        #btn-pause { background-color: #f39c12; }
+        #btn-pause:disabled { background-color: #bdc3c7; cursor: not-allowed; }
+        #btn-pause.resume-mode { background-color: var(--primary-color); }
+        #btn-add { background-color: transparent; color: var(--primary-color); border: 2px solid var(--primary-color); margin-bottom: 20px; width: 100%; padding: 12px; font-size: 16px; border-radius: 12px; }
+
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); justify-content: center; align-items: center; z-index: 100; }
+        .modal-overlay.active { display: flex; }
+        .modal { background: white; padding: 30px; border-radius: 15px; text-align: center; width: 80%; max-width: 350px; }
+        .modal input { margin: 15px 0; border: 1px solid #ccc; }
+        .modal-btns { display: flex; gap: 10px; margin-top: 10px; }
+        .modal-btns button { flex: 1; padding: 15px; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; font-weight: bold; color: white; }
+        #modal-yes, #modal-save { background: #2ecc71; }
+        #modal-no, #modal-cancel { background: #e74c3c; }
+    </style>
+</head>
+<body>
+
+    <div id="home-view" class="screen active">
+        <h2>Мои таймеры</h2>
+        <div class="timer-list" id="saved-timers-list"></div>
+        <button class="big-add-btn" onclick="openNewTimer()">+</button>
+    </div>
+
+    <div id="editor-view" class="screen">
+        <div class="top-nav">
+            <button class="nav-btn" onclick="goHome()">← Назад</button>
+            <button class="nav-btn" id="save-nav-btn" onclick="openSaveModal()">💾 Сохранить</button>
+        </div>
+        <div id="timer-display">00:00</div>
+        <div id="current-interval-name"></div>
+        <table id="interval-table">
+            <thead><tr><th style="width: 60%">Название</th><th style="width: 40%">Время (мм:сс)</th></tr></thead>
+            <tbody id="table-body"></tbody>
+        </table>
+        <button class="btn-control" id="btn-add" onclick="addRow()">+ Добавить интервал</button>
+        <div class="controls-container">
+            <button class="btn-control" id="btn-start" onclick="handleStartStop()">СТАРТ</button>
+            <button class="btn-control" id="btn-pause" onclick="handlePauseResume()" disabled>ПАУЗА</button>
+        </div>
+        <div id="total-time-display">Общее время тренировки: 00:00</div>
+    </div>
+
+    <div class="modal-overlay" id="confirm-modal">
+        <div class="modal">
+            <h3>Завершить тренировку?</h3>
+            <div class="modal-btns"><button id="modal-yes" onclick="confirmStop(true)">ДА</button><button id="modal-no" onclick="confirmStop(false)">НЕТ</button></div>
+        </div>
+    </div>
+    <div class="modal-overlay" id="save-modal">
+        <div class="modal">
+            <h3>Сохранить таймер</h3>
+            <input type="text" id="timer-name-input" placeholder="Название тренировки">
+            <div class="modal-btns"><button id="modal-save" onclick="saveTimer()">СОХРАНИТЬ</button><button id="modal-cancel" onclick="closeSaveModal()">ОТМЕНА</button></div>
+        </div>
+    </div>
+
+    <script>
+        let audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function playBeep(frequency, duration, type = 'sine', volume = 0.2) {
+            let osc = audioCtx.createOscillator(), gain = audioCtx.createGain();
+            osc.type = type; osc.frequency.value = frequency;
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            gain.gain.setValueAtTime(volume, audioCtx.currentTime);
+            osc.start(); osc.stop(audioCtx.currentTime + duration);
+        }
+        function playStartSound() { playBeep(900, 0.1, 'sine', 0.15); setTimeout(() => playBeep(900, 0.1, 'sine', 0.15), 150); setTimeout(() => playBeep(900, 0.1, 'sine', 0.15), 300); }
+        function playEndSound(isLast = false) { if (isLast) playBeep(1200, 1.5, 'sine', 0.4); else playBeep(1200, 0.3, 'sine', 0.25); }
+
+        let savedTimers = JSON.parse(localStorage.getItem('fartlek_saved_timers') || '[]');
+        let editingTimerId = null, timerInterval = null, timeRemaining = 0, currentRowIndex = -1, totalIntervals = 0, isRunning = false, isPaused = false, totalElapsedSeconds = 0; 
+
+        const tableBody = document.getElementById('table-body'), display = document.getElementById('timer-display'), intervalNameDisplay = document.getElementById('current-interval-name'), totalTimeDisplay = document.getElementById('total-time-display'), btnStartStop = document.getElementById('btn-start'), btnPauseResume = document.getElementById('btn-pause'), confirmModal = document.getElementById('confirm-modal'), saveModal = document.getElementById('save-modal'), saveNavBtn = document.getElementById('save-nav-btn');
+
+        function switchView(viewId) { document.querySelectorAll('.screen').forEach(s => s.classList.remove('active')); document.getElementById(viewId).classList.add('active'); }
+        function goHome() { if (isRunning) { alert("Сначала остановите тренировку."); return; } renderHome(); switchView('home-view'); }
+        function openNewTimer() { editingTimerId = null; tableBody.innerHTML = ''; for (let i = 0; i < 10; i++) addRow(false); display.textContent = '00:00'; intervalNameDisplay.textContent = ''; totalTimeDisplay.textContent = 'Общее время тренировки: 00:00'; saveNavBtn.style.display = 'block'; switchView('editor-view'); }
+        function openExistingTimer(id) { editingTimerId = id; const timer = savedTimers.find(t => t.id === id); if (!timer) return; tableBody.innerHTML = ''; timer.intervals.forEach(item => addRow(false, item.name, item.time)); display.textContent = '00:00'; intervalNameDisplay.textContent = ''; totalTimeDisplay.textContent = 'Общее время тренировки: 00:00'; saveNavBtn.style.display = 'block'; switchView('editor-view'); }
+
+        function saveTimer() {
+            const name = document.getElementById('timer-name-input').value.trim() || "Без названия";
+            const intervals = []; tableBody.querySelectorAll('tr').forEach(row => intervals.push({ name: row.cells[0].querySelector('input').value, time: row.cells[1].querySelector('input').value }));
+            if (editingTimerId === null) savedTimers.push({ id: Date.now(), name: name, intervals: intervals });
+            else { let idx = savedTimers.findIndex(t => t.id === editingTimerId); if (idx !== -1) { savedTimers[idx].name = name; savedTimers[idx].intervals = intervals; } }
+            localStorage.setItem('fartlek_saved_timers', JSON.stringify(savedTimers)); closeSaveModal(); goHome();
+        }
+        function deleteTimer(id) { if (confirm("Удалить этот таймер?")) { savedTimers = savedTimers.filter(t => t.id !== id); localStorage.setItem('fartlek_saved_timers', JSON.stringify(savedTimers)); renderHome(); } }
+        function renderHome() { const list = document.getElementById('saved-timers-list'); list.innerHTML = ''; if (savedTimers.length === 0) { list.innerHTML = '<p style="text-align:center; color:#888;">Нет сохраненных таймеров</p>'; return; } savedTimers.forEach(timer => { const card = document.createElement('div'); card.className = 'timer-card'; card.onclick = () => openExistingTimer(timer.id); const validIntervals = timer.intervals.filter(i => i.time && i.time.includes(':')); card.innerHTML = `<div><div class="timer-card-name">${timer.name}</div><div class="timer-card-info">${validIntervals.length} интервалов</div></div><button class="delete-card" onclick="event.stopPropagation(); deleteTimer(${timer.id})">×</button>`; list.appendChild(card); }); }
+        function openSaveModal() { document.getElementById('timer-name-input').value = ''; saveModal.classList.add('active'); }
+        function closeSaveModal() { saveModal.classList.remove('active'); }
+
+        function addRow(skipSave = false, nameVal = '', timeVal = '') {
+            const row = document.createElement('tr');
+            row.innerHTML = `<td><div class="input-wrapper"><input type="text" placeholder="Интервал" value="${nameVal}" oninput="toggleFilled(this)"><button class="clear-btn" onclick="clearInput(this)">Обнулить</button></div></td><td><div class="input-wrapper"><input type="text" maxlength="5" placeholder="00:00" value="${timeVal}" oninput="formatTimeInput(this)"><button class="clear-btn" onclick="clearInput(this)">Обнулить</button></div></td>`;
+            tableBody.appendChild(row); row.querySelectorAll('input').forEach(input => toggleFilled(input));
+        }
+        function clearInput(btn) { const input = btn.previousElementSibling; input.value = ''; input.classList.remove('filled'); }
+        function toggleFilled(input) { if (input.value.trim() !== '') input.classList.add('filled'); else input.classList.remove('filled'); }
+        function formatTimeInput(input) { let val = input.value.replace(/\D/g, ''); if (val.length > 2) input.value = val.slice(0, -2) + ':' + val.slice(-2); else input.value = val; toggleFilled(input); }
+        function parseTime(str) { if (!str) return 0; if (str.includes(':')) { let parts = str.split(':'); return (parseInt(parts[0]) || 0) * 60 + (parseInt(parts[1]) || 0); } return parseInt(str) || 0; }
+        function formatTime(seconds) { return `${Math.floor(seconds / 60).toString().padStart(2, '0')}:${(seconds % 60).toString().padStart(2, '0')}`; }
+        function updateDisplay() { display.textContent = formatTime(timeRemaining); totalTimeDisplay.textContent = `Общее время тренировки: ${formatTime(totalElapsedSeconds)}`; }
+        function clearActiveHighlight() { document.querySelectorAll('.active-row').forEach(row => row.classList.remove('active-row')); }
+        function disableTableInputs(disabled) { document.querySelectorAll('#table-body input').forEach(input => input.disabled = disabled); saveNavBtn.style.display = disabled ? 'none' : 'block'; }
+
+        function handleStartStop() { if (audioCtx.state === 'suspended') audioCtx.resume(); if (isRunning) { isPaused = true; confirmModal.classList.add('active'); } else { startWorkout(); } }
+        function startWorkout() {
+            const rows = tableBody.querySelectorAll('tr'); const intervals = [];
+            rows.forEach(row => { const name = row.cells[0].querySelector('input').value.trim() || "Интервал"; const time = parseTime(row.cells[1].querySelector('input').value); if (time > 0) intervals.push({ name, time, rowElement: row }); });
+            if (intervals.length === 0) { alert("Добавьте хотя бы один интервал с временем!"); return; }
+            isRunning = true; isPaused = false; currentRowIndex = 0; totalIntervals = intervals.length; totalElapsedSeconds = 0; 
+            btnStartStop.textContent = "СТОП"; btnStartStop.classList.add('stop-mode'); btnPauseResume.disabled = false;
+            disableTableInputs(true); startInterval(intervals[0]);
+        }
+        function startInterval(interval) {
+            clearActiveHighlight(); interval.rowElement.classList.add('active-row');
+            intervalNameDisplay.textContent = interval.name; timeRemaining = interval.time; updateDisplay(); playStartSound(); 
+            timerInterval = setInterval(() => {
+                if (!isPaused) {
+                    timeRemaining--; totalElapsedSeconds++; updateDisplay();
+                    let isLast = (currentRowIndex === totalIntervals - 1);
+                    if (timeRemaining === 1 && !isLast) playEndSound(false);
+                    if (timeRemaining <= 0) { clearInterval(timerInterval); if (isLast) playEndSound(true); nextInterval(); }
+                }
+            }, 1000);
+        }
+        function nextInterval() {
+            currentRowIndex++; const rows = tableBody.querySelectorAll('tr'); const intervals = [];
+            rows.forEach(row => { const name = row.cells[0].querySelector('input').value.trim() || "Интервал"; const time = parseTime(row.cells[1].querySelector('input').value); if (time > 0) intervals.push({ name, time, rowElement: row }); });
+            if (currentRowIndex < intervals.length) startInterval(intervals[currentRowIndex]); else finishWorkout();
+        }
+        function finishWorkout() {
+            isRunning = false; isPaused = false; clearActiveHighlight();
+            intervalNameDisplay.textContent = "Тренировка завершена!"; btnStartStop.textContent = "СТАРТ"; btnStartStop.classList.remove('stop-mode');
+            btnPauseResume.disabled = true; btnPauseResume.textContent = "ПАУЗА"; btnPauseResume.classList.remove('resume-mode');
+            disableTableInputs(false); timeRemaining = 0; updateDisplay(); 
+        }
+        function handlePauseResume() { if (!isRunning) return; if (isPaused) { isPaused = false; btnPauseResume.textContent = "ПАУЗА"; btnPauseResume.classList.remove('resume-mode'); } else { isPaused = true; btnPauseResume.textContent = "ПРОДОЛЖИТЬ"; btnPauseResume.classList.add('resume-mode'); } }
+        function confirmStop(confirmed) { confirmModal.classList.remove('active'); if (confirmed) { clearInterval(timerInterval); finishWorkout(); totalElapsedSeconds = 0; currentRowIndex = -1; updateDisplay(); intervalNameDisplay.textContent = ""; totalTimeDisplay.textContent = "Общее время тренировки: 00:00"; } else { isPaused = false; btnPauseResume.textContent = "ПАУЗА"; btnPauseResume.classList.remove('resume-mode'); } }
+        renderHome();
+    </script>
+</body>
+</html>
